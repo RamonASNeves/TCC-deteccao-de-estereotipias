@@ -1,0 +1,262 @@
+//Código TCC: Sistema Embarcado para Detecção e Monitoração de Estereotipias
+//Alunos: Aimê Samara, Carlos Daniel e Ramon Alexandrino - Elelt3 - CEFETMG
+
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+#include "BluetoothSerial.h"
+
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+
+BluetoothSerial SerialBT;
+Adafruit_MPU6050 mpu;
+
+#define LED 2
+#define BUZ 4
+#define MAX 1
+#define MIN 0
+#define max_xA  2.0
+#define min_xA -2.0
+#define max_yA -4.0
+#define min_yA -6.0
+#define max_zA  5.0
+#define min_zA -5.0
+#define max_xG  2.0
+#define min_xG -2.0
+#define max_yG -4.0
+#define min_yG -6.0
+#define max_zG  5.0
+#define min_zG -5.0
+#define nEvents 8    // 8 * 2 = 16
+int state_x = 0, state_y = 0, state_z = 0;
+int contadorTempo_x = 0, contadorTempo_y = 0, contadorTempo_z = 0;
+int contadorEventosA_x = 0, contadorEventosA_y = 0, contadorEventosA_z = 0;
+int contadorEventosG_x = 0, contadorEventosG_y = 0, contadorEventosG_z = 0;
+
+void setup(void) {
+  SerialBT.begin("ESP_RAMON"); 
+  pinMode(LED, OUTPUT);
+  pinMode(BUZ, OUTPUT);
+  Serial.begin(115200);
+  while (!Serial)delay(10);
+
+  Serial.println(" TCC: Sistema Embarcado para Detecção e Monitoração de Estereotipias");
+  Serial.println(" Alunos: Aimê Samara, Carlos Daniel e Ramon Alexandrino - Elelt3 - CEFETMG");
+
+  // Try to initialize!
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1) {
+      delay(10);
+    }
+  }
+  Serial.println("MPU6050 Found!");
+
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  Serial.print("Accelerometer range set to: ");
+  switch (mpu.getAccelerometerRange()) {
+    case MPU6050_RANGE_2_G:
+      Serial.println("+-2G");
+      break;
+    case MPU6050_RANGE_4_G:
+      Serial.println("+-4G");
+      break;
+    case MPU6050_RANGE_8_G:
+      Serial.println("+-8G");
+      break;
+    case MPU6050_RANGE_16_G:
+      Serial.println("+-16G");
+      break;
+  }
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  Serial.print("Gyro range set to: ");
+  switch (mpu.getGyroRange()) {
+    case MPU6050_RANGE_250_DEG:
+      Serial.println("+- 250 deg/s");
+      break;
+    case MPU6050_RANGE_500_DEG:
+      Serial.println("+- 500 deg/s");
+      break;
+    case MPU6050_RANGE_1000_DEG:
+      Serial.println("+- 1000 deg/s");
+      break;
+    case MPU6050_RANGE_2000_DEG:
+      Serial.println("+- 2000 deg/s");
+      break;
+  }
+
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  Serial.print("Filter bandwidth set to: ");
+  switch (mpu.getFilterBandwidth()) {
+    case MPU6050_BAND_260_HZ:
+      Serial.println("260 Hz");
+      break;
+    case MPU6050_BAND_184_HZ:
+      Serial.println("184 Hz");
+      break;
+    case MPU6050_BAND_94_HZ:
+      Serial.println("94 Hz");
+      break;
+    case MPU6050_BAND_44_HZ:
+      Serial.println("44 Hz");
+      break;
+    case MPU6050_BAND_21_HZ:
+      Serial.println("21 Hz");
+      break;
+    case MPU6050_BAND_10_HZ:
+      Serial.println("10 Hz");
+      break;
+    case MPU6050_BAND_5_HZ:
+      Serial.println("5 Hz");
+      break;
+  }
+
+  Serial.println("");
+  delay(100);
+}
+
+void loop() {
+
+  /* Get new sensor events with the readings */
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+  // avaliações dos eixos
+  Serial.println("");
+  delay(500);
+
+  contadorTempo_x++;          //incrementa contadorTempo a cada 0,5s (observar delay na linha acima)
+  contadorTempo_y++;          //incrementa contadorTempo a cada 0,5s (observar delay na linha acima)
+  contadorTempo_z++;          //incrementa contadorTempo a cada 0,5s (observar delay na linha acima)
+
+  // ACELERAÇÃO EIXO X
+  if ((a.acceleration.x > max_xA) && state_x == MAX)
+  {
+    contadorEventosA_x++;
+    state_x = MIN;
+    contadorTempo_x = 0;
+  }
+  else if ((a.acceleration.x < min_xA) && state_x == MIN) //
+  {
+    contadorEventosA_x++;
+    state_x = MAX;
+    contadorTempo_x = 0;
+  }
+
+  // ACELERAÇÃO EIXO Y
+  if ((a.acceleration.y > max_yA) && state_y == MAX)
+  {
+    contadorEventosA_y++;
+    state_y = MIN;
+    contadorTempo_y = 0;
+  }
+  else if ((a.acceleration.y < min_yA) && state_y == MIN) //
+  {
+    contadorEventosA_y++;
+    state_y = MAX;
+    contadorTempo_y = 0;
+  }
+
+  // ACELERAÇÃO EIXO Z
+  if ((a.acceleration.z > max_zA) && state_z == MAX)
+  {
+    contadorEventosA_z++;
+    state_z = MIN;
+    contadorTempo_z = 0;
+  }
+  else if ((a.acceleration.z < min_zA) && state_z == MIN) //
+  {
+    contadorEventosA_z++;
+    state_z = MAX;
+    contadorTempo_z = 0;
+  }
+
+  // VELOCIDADE EIXO X
+  if ((g.gyro.x > max_xG) && state_x == MAX)
+  {
+    contadorEventosG_x++;
+    state_x = MIN;
+    contadorTempo_x = 0;
+  }
+  else if ((g.gyro.x < min_xG) && state_x == MIN) //
+  {
+    contadorEventosG_x++;
+    state_x = MAX;
+    contadorTempo_x = 0;
+  }
+
+   // VELOCIDADE EIXO Y
+  if ((g.gyro.y > max_yG) && state_y == MAX)
+  {
+    contadorEventosG_y++;
+    state_y = MIN;
+    contadorTempo_y = 0;
+  }
+  else if ((g.gyro.y < min_yG) && state_y == MIN) //
+  {
+    contadorEventosG_y++;
+    state_y = MAX;
+    contadorTempo_y = 0;
+  }
+
+  // VELOCIDADE EIXO Z
+  if ((g.gyro.z > max_zG) && state_z == MAX)
+  {
+    contadorEventosG_z++;
+    state_z = MIN;
+    contadorTempo_z = 0;
+  }
+  else if ((g.gyro.z < min_zG) && state_z == MIN) //
+  {
+    contadorEventosG_z++;
+    state_z = MAX;
+    contadorTempo_z = 0;
+  }
+  
+  if (contadorTempo_x >= 7)contadorEventosA_x = 0;
+  if (contadorTempo_y >= 7)contadorEventosA_y = 0;
+  if (contadorTempo_z >= 7)contadorEventosA_z = 0; 
+  if (contadorTempo_x >= 7)contadorEventosG_x = 0;
+  if (contadorTempo_y >= 7)contadorEventosG_y = 0;
+  if (contadorTempo_z >= 7)contadorEventosG_z = 0;
+
+  if (  ((contadorEventosA_x >= nEvents) && (contadorTempo_x < 7)) ||
+        ((contadorEventosA_y >= nEvents) && (contadorTempo_y < 7)) ||
+        ((contadorEventosA_z >= nEvents) && (contadorTempo_z < 7)) ||
+        ((contadorEventosG_x >= nEvents) && (contadorTempo_x < 7)) ||
+        ((contadorEventosG_y >= nEvents) && (contadorTempo_y < 7)) ||
+        ((contadorEventosG_z >= nEvents) && (contadorTempo_z < 7))  )
+  {
+    digitalWrite(LED, HIGH);
+    digitalWrite(BUZ, HIGH);
+    SerialBT.print("ESTEREOTIPIA ACONTECENDO");
+  }
+  else {
+    digitalWrite(LED, LOW);
+    digitalWrite(BUZ, LOW);
+    //SerialBT.print("TUDO OK");
+    
+  }
+  Serial.print("\nContador Tempo X: ");
+  Serial.print(contadorTempo_x);
+  Serial.print("\nContador EventosA_x: ");
+  Serial.print(contadorEventosA_x);
+  Serial.print("\nContador EventosG_x: ");
+  Serial.print(contadorEventosG_x);
+  
+  Serial.print("\nContador Tempo Y: ");
+  Serial.print(contadorTempo_y);
+  Serial.print("\nContador EventosA_y: ");
+  Serial.print(contadorEventosA_y);
+  Serial.print("\nContador EventosG_y: ");
+  Serial.print(contadorEventosG_y);
+  
+  Serial.print("\nContador Tempo Z: ");
+  Serial.print(contadorTempo_z);
+  Serial.print("\nContador EventosA_z: ");
+  Serial.print(contadorEventosA_z);
+  Serial.print("\nContador EventosG_z: ");
+  Serial.print(contadorEventosG_z);
+}
